@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Conda
+*.egg-info/
+
+# VSCode / PyCharm
+.vscode/
+.idea/
+
+# Data / models / results
+data/
+models/*.pth
+models/*.pt
+models/*.onnx
+models/*.engine
+models/*.trt
+results/*.csv
+results/*.png
+results/*.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

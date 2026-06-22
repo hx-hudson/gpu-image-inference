@@ -1,0 +1,14 @@
+torch
+torchvision
+onnx
+onnxruntime-gpu
+tensorrt
+numpy
+pandas
+matplotlib
+pyyaml
+tqdm
+fastapi
+uvicorn
+pillow
+python-multipart
