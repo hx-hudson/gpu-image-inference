@@ -118,7 +118,7 @@ if __name__ == "__main__":
             best_acc = test_acc
             torch.save(
                 {
-                    "epoch": epoch + 1,
+                    "epoch": epoch,
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
                     "best_acc": best_acc
