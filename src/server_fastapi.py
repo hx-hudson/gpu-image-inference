@@ -5,7 +5,6 @@ from PIL import Image
 import torch
 from torchvision import transforms
 from model import load_model
-from
 
 CLASS_NAMES = [
     "airplane",
