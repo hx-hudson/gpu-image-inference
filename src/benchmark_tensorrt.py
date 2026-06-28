@@ -3,7 +3,7 @@ import argparse
 import torch
 import tensorrt as trt
 import time
-from benchmark_pytorch import print_results, save_results
+from src.benchmark_pytorch import print_results, save_results
 
 def get_args():
     parser = argparse.ArgumentParser()

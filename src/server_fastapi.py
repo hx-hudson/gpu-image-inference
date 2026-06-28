@@ -1,10 +1,12 @@
 from io import BytesIO
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from PIL import Image
 
+import tensorrt as trt
 import torch
 from torchvision import transforms
-from model import load_model
+from src.model import load_model
+from src.benchmark_tensorrt import load_engine, inspect_engine
 
 CLASS_NAMES = [
     "airplane",
@@ -27,6 +29,7 @@ transform = transforms.Compose([
         std=(0.2470, 0.2435, 0.2616)
     )
 ])
+
 app = FastAPI(
     title="GPU Image Inference Server",
     description="FastAPI server for CIFAR-10 image classification",
@@ -34,9 +37,54 @@ app = FastAPI(
 )
 
 device = torch.device("cuda")
-model = load_model()
+model = load_model(
+        r"D:\Py Project\gpu-image-inference\models\resnet_cifar10.pth",
+        device
+    )
 model.to(device)
 model.eval()
+
+engine = load_engine(r"D:\Py Project\gpu-image-inference\models\resnet_cifar10_fp32.trt")
+context = engine.create_execution_context()
+
+input_name, output_name = inspect_engine(engine)
+dtype = engine.get_tensor_dtype(input_name)
+
+if dtype == trt.DataType.FLOAT:
+    torch_dtype = torch.float32
+else:
+    torch_dtype = torch.float16
+
+def predict_pytorch(image):
+
+    with torch.no_grad():
+        logits = model(image)
+        prediction = logits.argmax(dim=1).item()
+
+    return prediction
+
+def predict_tensorrt(image):
+    input_shape = image.shape
+    output_shape = (image.shape[0], 10)
+    context.set_input_shape(input_name, input_shape)
+
+    input_tensor = torch.tensor(
+        image, device=device, dtype=torch_dtype
+    ).contiguous()
+    output_tensor = torch.empty(
+        output_shape, device=device, dtype=torch_dtype
+    ).contiguous()
+    context.set_tensor_address(input_name, input_tensor.data_ptr())
+    context.set_tensor_address(output_name, output_tensor.data_ptr())
+
+    trt_stream = torch.cuda.Stream()
+    trt_stream.wait_stream(torch.cuda.current_stream())
+    context.execute_async_v3(trt_stream.cuda_stream)
+    trt_stream.synchronize()
+
+    prediction = output_tensor.argmax(dim=1).item()
+
+    return prediction
 
 @app.get("/")
 def root():
@@ -52,16 +100,25 @@ def health():
     }
 
 @app.post("/predict")
-async def predict(file: UploadFile = File(...)):
+async def predict(
+        file: UploadFile = File(...),
+        backend: str = "pytorch"
+):
     image_bytes = await file.read()
     image = Image.open(BytesIO(image_bytes)).convert("RGB")
     image = transform(image)
     image = image.unsqueeze(0).to(device)
 
-    with torch.no_grad():
-        logits = model(image)
-        prediction = logits.argmax(dim=1)
+    if backend == "pytorch":
+        return {
+            "class": CLASS_NAMES[predict_pytorch(image)]
+        }
+    elif backend == "tensorrt":
+        return {
+            "class": CLASS_NAMES[predict_tensorrt(image)]
+        }
 
-    return {
-        "class": CLASS_NAMES[prediction]
-    }
+    raise HTTPException(
+        status_code=400,
+        detail=f"Unsupported backend: {backend}"
+    )

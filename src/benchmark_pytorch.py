@@ -3,7 +3,7 @@ import csv
 import time
 import torch
 import argparse
-from model import load_model
+from src.model import load_model
 import torch.nn as nn
 
 def get_args():
